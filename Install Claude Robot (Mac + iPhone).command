@@ -202,6 +202,8 @@ def main():
     for m in rows:
         p,sv=int(m.get("pct",0)),m.get("sev")
         print("---"); print(f"Weekly · {m.get('name','?')}   {p}% used | color={col(p,sv)} {mono}"); print(f"  {bar(p)}  | color={col(p,sv)} {mono}")
+        if m.get("reset_iso"):
+            mf,mr,_=fmt(m["reset_iso"]); print(f"  resets in {mr}  ·  {mf} | color=#888888 size=12")
     print("---")
     if d.get("stale"): print(f"⏳ showing last update (retrying) | color=#ff9f43 size=11")
     print("Open Usage settings | href=https://claude.ai/settings/usage"); print("Refresh now | refresh=true")
@@ -246,7 +248,7 @@ if(!data||!data.ok){const t=w.addText("🤖 Claude");t.font=Font.boldSystemFont(
 const s=data.session_pct,wk=data.weekly_pct;const hd=w.addStack();hd.centerAlignContent();const ti=hd.addText("🤖  Claude");ti.font=Font.boldSystemFont(13);ti.textColor=Color.white();hd.addSpacer();const fa=hd.addText(faceFor(Math.max(s,wk)));fa.font=Font.systemFont(12);fa.textColor=colorFor(Math.max(s,wk));
 w.addSpacer(8);row(w,"🤖","Session",s,`resets in ${resetsIn(data.session_reset_iso)} · ${clockOf(data.session_reset_iso)}`);
 w.addSpacer(7);row(w,"📅","Weekly",wk,`resets in ${resetsIn(data.weekly_reset_iso)}`);
-const ms=(data.models&&data.models.length)?data.models:(data.opus_pct!=null?[{name:"Opus",pct:data.opus_pct}]:[]);for(const m of ms){w.addSpacer(7);row(w,"🧠",`Weekly · ${m.name}`,m.pct,null);}
+const ms=(data.models&&data.models.length)?data.models:(data.opus_pct!=null?[{name:"Opus",pct:data.opus_pct}]:[]);for(const m of ms){w.addSpacer(7);row(w,"🧠",`Weekly · ${m.name}`,m.pct,m.reset_iso?`resets in ${resetsIn(m.reset_iso)}`:null);}
 w.addSpacer();const st=(data.fetched_epoch||data.updated_epoch)*1000;const ft=w.addText("updated "+clockOf(new Date(st).toISOString())+(data.stale?" · syncing…":""));ft.font=Font.systemFont(8);ft.textColor=DIM;
 w.refreshAfterDate=new Date(Date.now()+60000);return w;}
 const widget=await build();if(config.runsInWidget){Script.setWidget(widget);}else{await widget.presentMedium();}Script.complete();

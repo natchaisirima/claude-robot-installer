@@ -224,7 +224,8 @@ def tooltip(state):
     rows = state.get("models") or ([{"name": "Opus", "pct": state["opus_pct"]}]
                                    if state.get("opus_pct") is not None else [])
     for m in rows:
-        lines.append(f"{m.get('name', '?')} wk {m.get('pct', 0)}%")
+        extra = f" (resets {rel(m['reset_iso'])})" if m.get("reset_iso") else ""
+        lines.append(f"{m.get('name', '?')} wk {m.get('pct', 0)}%{extra}")
     if state.get("stale"):
         lines.append("(last update, retrying)")
     return "\n".join(lines)
