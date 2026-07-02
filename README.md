@@ -52,3 +52,6 @@ your own free Firebase project; nothing is sent anywhere else.
 | --- | --- |
 | `Install Claude Robot (Mac + iPhone).command` | The double-click installer (Mac menubar + iPhone widget). |
 | `README - Read Me First.txt` | Plain-text quick-start (same content as this README). |
+| `windows/robot.py` | Windows variant: system-tray robot + Firebase publisher in one process (reads the token from the Windows creds file instead of the macOS Keychain). |
+| `windows/robot.js` | Scriptable iPhone-widget script template (the installer fills in `__DATA_URL__`). |
+| `LICENSE` | MIT. |
