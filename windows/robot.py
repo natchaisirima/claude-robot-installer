@@ -6,7 +6,7 @@
 # Runs forever: every few minutes it fetches your Claude usage and (if configured)
 # deploys it to YOUR Firebase for the iPhone widget; every ~20s it refreshes the
 # tray icon + tooltip from the local usage.json.
-import os, sys, json, time, shutil, tempfile, threading, subprocess, webbrowser, traceback
+import os, sys, json, time, shutil, tempfile, threading, subprocess, webbrowser, traceback, hashlib
 import urllib.request, urllib.error
 from datetime import datetime, timezone
 
@@ -19,6 +19,9 @@ TICK = 20                # main loop tick (icon refresh) seconds
 HOME = os.path.expanduser("~")
 ROOT = os.path.join(HOME, ".claude-robot")
 STATE = os.path.join(ROOT, "usage.json")
+# Token fingerprint lives in its own file (never in usage.json, which is
+# copied verbatim to public Firebase hosting).
+TOKEN_FP = os.path.join(ROOT, "token.fp")
 CFG = os.path.join(ROOT, "config.json")
 LOG = os.path.join(ROOT, "robot.err.log")
 # Windows/Linux: Claude Code stores creds in ~/.claude/.credentials.json
@@ -118,8 +121,33 @@ def deploy_fb(state, now):
     return state
 
 
+def token_changed():
+    """True when the creds-file token differs from the one last seen — i.e. the
+    user switched accounts or re-logged-in, so any 401 backoff is obsolete."""
+    try:
+        fp = hashlib.sha256(token().encode()).hexdigest()[:16]
+    except Exception:
+        return False   # logged out / creds unreadable: nothing to fetch with
+    try:
+        with open(TOKEN_FP, encoding="utf-8") as f:
+            old = f.read().strip()
+    except Exception:
+        old = ""
+    if fp == old:
+        return False
+    try:
+        with open(TOKEN_FP, "w", encoding="utf-8") as f:
+            f.write(fp)
+    except Exception:
+        pass
+    return old != ""   # first run just records the fingerprint
+
+
 def update(state):
     now = int(time.time())
+    if token_changed():
+        state["backoff_level"] = 0
+        state["next_fetch_epoch"] = 0
     if state.get("next_fetch_epoch", 0) > now:
         state = deploy_fb(state, now); wa(STATE, state); return state
     try:

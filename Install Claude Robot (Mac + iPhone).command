@@ -56,12 +56,14 @@ mkdir -p "$HOME/.claude-robot"
 # --- 4. Publisher (config-driven; single API caller) ------------------------
 cat > "$HOME/.claude-robot/publish-usage.py" <<'PYEOF'
 #!/usr/bin/env python3
-import os, json, time, shutil, subprocess, urllib.request, urllib.error, tempfile
+import os, json, time, shutil, subprocess, urllib.request, urllib.error, tempfile, hashlib
 from datetime import datetime, timezone
 ENDPOINT="https://api.anthropic.com/api/oauth/usage"
 BASE_INTERVAL=300; MAX_BACKOFF=1800; DEPLOY_INTERVAL=600
 HOME=os.path.expanduser("~")
 STATE=os.path.join(HOME,".claude-robot","usage.json")
+# fingerprint kept out of usage.json — that file is published to Firebase
+TOKEN_FP=os.path.join(HOME,".claude-robot","token.fp")
 CFG=os.path.join(HOME,".claude-robot","config.json")
 FB_DIR=os.path.join(HOME,".claude-robot","fb")
 FB_PUBLIC=os.path.join(FB_DIR,"public","usage.json")
@@ -112,8 +114,23 @@ def deploy_fb(state,now):
         state["fb_error"]=str(e)[:160]; state["fb_next_epoch"]=now+300
     return state
 
+def token_changed():
+    # account switch / re-login makes any 401 backoff obsolete — fetch now
+    try: fp=hashlib.sha256(token().encode()).hexdigest()[:16]
+    except Exception: return False
+    try:
+        with open(TOKEN_FP) as f: old=f.read().strip()
+    except Exception: old=""
+    if fp==old: return False
+    try:
+        with open(TOKEN_FP,"w") as f: f.write(fp)
+    except Exception: pass
+    return old!=""
+
 def main():
     now=int(time.time()); state=load()
+    if token_changed():
+        state["backoff_level"]=0; state["next_fetch_epoch"]=0
     if state.get("next_fetch_epoch",0)>now:
         wa(STATE,state); state=deploy_fb(state,now); wa(STATE,state); return
     try:
