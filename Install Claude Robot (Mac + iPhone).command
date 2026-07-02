@@ -96,7 +96,7 @@ def deploy_fb(state,now):
     c=cfg(); proj=c.get("fb_project")
     if not proj or not os.path.isdir(FB_DIR) or "session_pct" not in state: return state
     if now < state.get("fb_next_epoch",0): return state
-    cur=[state.get("session_pct"),state.get("weekly_pct"),state.get("opus_pct"),state.get("stale")]
+    cur=[state.get("session_pct"),state.get("weekly_pct"),state.get("opus_pct"),[m.get("pct") for m in state.get("models") or []],state.get("stale")]
     if cur==state.get("fb_last") and state.get("fb_deployed_once"):
         state["fb_next_epoch"]=now+120; return state
     try:
@@ -119,11 +119,15 @@ def main():
     try:
         d=fetch(); L={x.get("kind"):x for x in d.get("limits",[])}
         s=L.get("session") or {}; w=L.get("weekly_all") or {}; o=d.get("seven_day_opus")
+        models=[{"name":(((x.get("scope") or {}).get("model") or {}).get("display_name") or "Scoped"),
+                 "pct":int(x.get("percent") or 0),"sev":x.get("severity"),"reset_iso":x.get("resets_at")}
+                for x in d.get("limits",[]) if x.get("kind")=="weekly_scoped"]
         state={"ok":True,"stale":False,
             "session_pct":int(s.get("percent",round(d.get("five_hour",{}).get("utilization",0)))),
             "weekly_pct":int(w.get("percent",round(d.get("seven_day",{}).get("utilization",0)))),
             "session_sev":s.get("severity"),"weekly_sev":w.get("severity"),
             "opus_pct":int(round(o["utilization"])) if o and o.get("utilization") is not None else None,
+            "models":models,
             "session_reset_iso":s.get("resets_at") or d.get("five_hour",{}).get("resets_at"),
             "weekly_reset_iso":w.get("resets_at") or d.get("seven_day",{}).get("resets_at"),
             "fetched_epoch":now,"updated_epoch":now,"error":None,"backoff_level":0,"next_fetch_epoch":now+BASE_INTERVAL}
@@ -193,9 +197,10 @@ def main():
     print(f"  {bar(s)}  | color={col(s,ss)} {mono}"); print(f"  resets in {sr}  ·  {sf} | color=#888888 size=12"); print("---")
     print(f"Weekly · all models   {w}% used | color={col(w,ws)} {mono}")
     print(f"  {bar(w)}  | color={col(w,ws)} {mono}"); print(f"  resets in {wr}  ·  {wf} | color=#888888 size=12")
-    o=d.get("opus_pct")
-    if o is not None:
-        print("---"); print(f"Weekly · Opus   {o}% used | color={col(o,None)} {mono}"); print(f"  {bar(o)}  | color={col(o,None)} {mono}")
+    rows=d.get("models") or ([{"name":"Opus","pct":d["opus_pct"],"sev":None}] if d.get("opus_pct") is not None else [])
+    for m in rows:
+        p,sv=int(m.get("pct",0)),m.get("sev")
+        print("---"); print(f"Weekly · {m.get('name','?')}   {p}% used | color={col(p,sv)} {mono}"); print(f"  {bar(p)}  | color={col(p,sv)} {mono}")
     print("---")
     if d.get("stale"): print(f"⏳ showing last update (retrying) | color=#ff9f43 size=11")
     print("Open Usage settings | href=https://claude.ai/settings/usage"); print("Refresh now | refresh=true")
@@ -240,7 +245,7 @@ if(!data||!data.ok){const t=w.addText("🤖 Claude");t.font=Font.boldSystemFont(
 const s=data.session_pct,wk=data.weekly_pct;const hd=w.addStack();hd.centerAlignContent();const ti=hd.addText("🤖  Claude");ti.font=Font.boldSystemFont(15);ti.textColor=Color.white();hd.addSpacer();const fa=hd.addText(faceFor(Math.max(s,wk)));fa.font=Font.systemFont(13);fa.textColor=colorFor(Math.max(s,wk));
 w.addSpacer(10);row(w,"🤖","Session",s,`⏰ resets in ${resetsIn(data.session_reset_iso)} · ${clockOf(data.session_reset_iso)}`);
 w.addSpacer(9);row(w,"📅","Weekly",wk,`resets in ${resetsIn(data.weekly_reset_iso)}`);
-if(data.opus_pct!=null){w.addSpacer(9);row(w,"🧠","Weekly · Opus",data.opus_pct,null);}
+const ms=(data.models&&data.models.length)?data.models:(data.opus_pct!=null?[{name:"Opus",pct:data.opus_pct}]:[]);for(const m of ms){w.addSpacer(9);row(w,"🧠",`Weekly · ${m.name}`,m.pct,null);}
 w.addSpacer();const st=(data.fetched_epoch||data.updated_epoch)*1000;const ft=w.addText("updated "+clockOf(new Date(st).toISOString())+(data.stale?" · syncing…":""));ft.font=Font.systemFont(9);ft.textColor=DIM;
 w.refreshAfterDate=new Date(Date.now()+60000);return w;}
 const widget=await build();if(config.runsInWidget){Script.setWidget(widget);}else{await widget.presentMedium();}Script.complete();
