@@ -1,2 +1,5 @@
 *.zip
 .DS_Store
+
+# personal convenience shortcut, not part of the installer
+Restart SwiftBar.command
